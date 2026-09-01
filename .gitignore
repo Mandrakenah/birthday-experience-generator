@@ -44,3 +44,6 @@ next-env.d.ts
 
 # driver screenshots (.claude/skills/run-birthday-experience-generator)
 /.driver-shots/
+
+.vercel
+.env*
