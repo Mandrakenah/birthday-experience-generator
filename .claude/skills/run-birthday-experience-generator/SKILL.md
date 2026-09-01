@@ -53,7 +53,16 @@ python .claude/skills/run-birthday-experience-generator/driver.py flow
 
 # screenshot specific routes
 python .claude/skills/run-birthday-experience-generator/driver.py shot / login b/test-slug
+
+# FULL end-to-end against live Supabase (needs real keys in .env.local):
+# signup -> create -> upload photo -> theme -> publish -> view /b/<slug>
+# anonymously -> confirm a second account cannot see the first's projects
+python .claude/skills/run-birthday-experience-generator/e2e.py
 ```
+
+`e2e.py` prints `[PASS]`/`[FAIL]` per step and exits non-zero if any fail. It signs
+up a fresh throwaway account each run (`e2e-<timestamp>@example.com`), so it is
+safe to re-run, but it does leave real users and projects in the Supabase project.
 
 Screenshots land in `.driver-shots/` (gitignored). **Open them and look.**
 
@@ -93,6 +102,19 @@ There is no test suite.
   fetch"**; the browser console carries `ERR_NAME_NOT_RESOLVED`. Nothing is broken.
   Real keys (see `supabase/SETUP.md`) fix all of it. Restart `npm run dev` after
   editing env and confirm `- Environments: .env.local` appears in the log.
+
+- **RLS policies are OR'd — never rely on RLS alone to scope a read to the owner.**
+  `Public reads published projects` sits alongside the owner policy, so a bare
+  `select()` on `birthday_projects` returns every user's *published* rows to any
+  caller. Both `/api/projects` (GET) and `/api/upload` now compare `creator_id`
+  explicitly; do the same in any new query. Verified live: drafts stay private and
+  cross-account UPDATE/DELETE affect zero rows, but published rows are readable by
+  anyone — which is required for `/b/<slug>` to work for strangers.
+
+- **Publishing needs a photo.** `canPublish = recipient.trim() && photos.length > 0`
+  (`app/editor/[id]/page.tsx`). The publish control is a **toggle switch** with
+  `aria-label="Publish"` and no text, so it is invisible to text-based button
+  scans — find it with `get_by_role("switch", name="Publish")`.
 
 - **Protected routes redirect, so a 200 is not proof you reached the page.** `proxy.ts`
   gates `/dashboard` and `/editor/*` server-side — unauthenticated requests get a

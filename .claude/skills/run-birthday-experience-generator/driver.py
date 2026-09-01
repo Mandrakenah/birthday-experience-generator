@@ -54,7 +54,7 @@ def smoke():
         dt = time.time() - t0
         head = _text(body, r"<h1[^>]*>(.*?)</h1>") or _text(body, r"<title[^>]*>(.*?)</title>")
         is404 = "404" in body and "not found" in body.lower()
-        note = "  [renders 404 - expected without real Supabase keys]" if is404 else ""
+        note = "  [404 - no project with that slug, expected]" if is404 else ""
         print("%-14s %s  %5.2fs  %6db  %s%s" % (route, status, dt, len(body), head, note))
         if status >= 400:
             bad.append(route)

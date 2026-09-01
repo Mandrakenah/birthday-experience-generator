@@ -20,9 +20,13 @@ export async function GET() {
   } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
+  // Filter by creator_id explicitly. RLS policies are OR'd, so the
+  // "Public reads published projects" policy would otherwise make this return
+  // every user's published projects — strangers' pages in your dashboard.
   const { data, error } = await supabase
     .from('birthday_projects')
     .select('*')
+    .eq('creator_id', user.id)
     .order('updated_at', { ascending: false });
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });

@@ -12,19 +12,25 @@ machine. It travels with the repo (the chat-based memory does NOT).
   landing page with an animated phone preview, **7 themes** (the original 5 + `sweetheart`
   cute/hearts + `custom` full page-builder), and a professional light+violet restyle of
   the entire creator UI. The recipient experience at `/b/[slug]` stays colorful/themed.
-- It has **never been run against a real Supabase project** — that's the main thing left.
+- **It now runs end-to-end against a real Supabase project** (verified 2026-08-31):
+  signup → create → upload → publish → anonymous `/b/<slug>`, plus cross-account
+  isolation. Re-run with `.claude/skills/run-birthday-experience-generator/e2e.py`.
+- Repo is live at https://github.com/Mandrakenah/birthday-experience-generator (public, MIT).
+- Next up: deploy (`DEPLOY.md`) and prod hardening (`SECURITY.md`).
 
 ## FIRST STEPS on this (new) laptop — do these in order
 
 1. `npm install` (do NOT copy `node_modules` across machines — native binaries differ).
-2. `git init` — the previous machine's `.git` was **corrupt** (`fatal: bad object HEAD`).
-   The working files are all intact; just start a fresh history. Committing here is fine
-   (the old "don't commit" rule was specific to the previous work laptop).
-3. Create the real `.env.local` from `.env.example` and run the Supabase setup:
-   see [`../supabase/SETUP.md`](../supabase/SETUP.md) — run migrations **0001, 0002, 0003**,
-   create the public `birthday-media` bucket, enable Email auth (confirmation OFF), then
-   fill the 4 keys in `.env.local`.
-4. `npm run dev` → http://localhost:3000.
+2. `git clone https://github.com/Mandrakenah/birthday-experience-generator` — history now
+   lives on GitHub. (The original machine's `.git` was corrupt; a fresh history was
+   started 2026-08-31 and pushed.)
+3. Create `.env.local` from `.env.example` and fill the 4 values. The Supabase project
+   (`For Her`, ca-central-1) is already provisioned with schema, RLS, the
+   `birthday-media` bucket, and Email auth with confirmation OFF — you only need the
+   keys from Project Settings → API Keys. For a **fresh** Supabase project instead,
+   see [`../supabase/SETUP.md`](../supabase/SETUP.md); note the bucket can be created in
+   SQL rather than by hand.
+4. `npm run dev` → http://localhost:3000, then `e2e.py` to confirm the whole flow.
 
 ### ⚠️ Gotcha that will waste your time otherwise
 `.env.local` **must exist with non-empty** `NEXT_PUBLIC_SUPABASE_URL` + `..._ANON_KEY`, or
@@ -36,20 +42,26 @@ bug. Real keys fix it. Restart `npm run dev` after editing env (look for
 
 ## What still needs doing
 
-- **End-to-end test** (after Supabase is live): sign up → create project → upload photos →
-  write message/pick theme → publish → open `/b/[slug]` in incognito. Confirm RLS blocks
-  reading another user's draft.
-- **Re-verify the 2026-08-31 audit fixes against real Supabase.** All six pass
-  `npm run verify` but none has run against a live backend: the `custom_theme` autosave
-  loop (`CustomThemeEditor`), the background upload above, `/api/upload` ownership +
-  music/video replacement, photo `sort_order`, the mic tap-escape, and the newly added
-  root `proxy.ts` (session refresh + `/dashboard`/`/editor` gating, which was documented
-  as shipped but did not exist). To drive any of it, use
-  `/run-birthday-experience-generator`.
-- **Custom theme background-photo upload** — DONE, but **never run against real
-  Supabase**. It now uploads to Storage and persists the public URL
-  (`CustomThemeEditor.onBgImage`). It deliberately writes no `project_media` row, or the
-  background would also appear in the photo slideshow. Verify this on the first real run.
+- **End-to-end test** — DONE (2026-08-31), all green against a real Supabase project
+  (`For Her`, ca-central-1). signup -> create -> upload photo -> theme -> publish ->
+  open `/b/<slug>` anonymously -> second account sees none of the first's projects.
+  Re-run any time with `.claude/skills/run-birthday-experience-generator/e2e.py`.
+- **Custom theme background upload is still unverified against real Storage.** The
+  e2e uses the Sweetheart theme; nobody has exercised `CustomThemeEditor.onBgImage`
+  against live Supabase yet.
+- **Test data lives in the Supabase project**: users `e2e-*@example.com`,
+  `rls-*@example.com`, `atk-*@example.com`, `probe*@example.com`, `smoke@example.com`,
+  plus their projects and uploaded photos. Delete before going live.
+- **Audit-fix verification status** (fixes made 2026-08-31). Exercised live by the e2e:
+  `proxy.ts` gating, `/api/upload` (photo path), publish, and the anonymous recipient
+  view. NOT yet exercised live: the `custom_theme` autosave loop, the background-photo
+  upload, music/video replacement, photo `sort_order` after a delete, and the mic
+  tap-escape.
+- **`/api/projects` GET leaked other users' published projects** into any signed-in
+  user's dashboard — RLS policies are OR'd, so `Public reads published projects`
+  satisfied the bare select. Caught by the e2e's RLS check and fixed with an explicit
+  `.eq('creator_id', user.id)`. An earlier code audit flagged this and a verifier
+  wrongly refuted it: **trust the live check over the review.**
 - **Device QA**: real iPhone Safari for the mic blow-out (`useMicrophone`), Android Chrome.
 - **Deploy**: see [`../DEPLOY.md`](../DEPLOY.md). Set `NEXT_PUBLIC_APP_URL` to the real origin.
 - **Prod hardening**: see [`../SECURITY.md`](../SECURITY.md) (re-enable email confirmation,
