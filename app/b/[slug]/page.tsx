@@ -3,9 +3,17 @@ import { createClient } from '@/lib/supabase/server';
 import { notFound } from 'next/navigation';
 import { ExperienceShell } from '@/components/experience/ExperienceShell';
 import { RecordView } from '@/components/experience/RecordView';
+import type { Metadata } from 'next';
 import type { ExperienceData, ProjectMedia } from '@/types';
 
 export const dynamic = 'force-dynamic';
+
+// A published page carries someone's name, photos and a personal message. It is
+// meant to be opened from a link the creator sent, not found in a search result,
+// so keep these out of search indexes. The marketing pages stay indexable.
+export const metadata: Metadata = {
+  robots: { index: false, follow: false },
+};
 
 export default async function ExperiencePage({
   params,
