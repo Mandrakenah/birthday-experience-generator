@@ -63,7 +63,17 @@ bug. Real keys fix it. Restart `npm run dev` after editing env (look for
   `.eq('creator_id', user.id)`. An earlier code audit flagged this and a verifier
   wrongly refuted it: **trust the live check over the review.**
 - **Device QA**: real iPhone Safari for the mic blow-out (`useMicrophone`), Android Chrome.
-- **Deploy**: see [`../DEPLOY.md`](../DEPLOY.md). Set `NEXT_PUBLIC_APP_URL` to the real origin.
+- **Deploy** — DONE. Live at **https://birthday-experience-generator.vercel.app**
+  (Vercel, Hobby, project `birthday-experience-generator` under `mandrakenahs-projects`).
+  All four env vars are set for the `production` environment in the Vercel dashboard;
+  `NEXT_PUBLIC_APP_URL` is the real origin, so Publish generates working share links.
+  The full e2e passes against production, not just localhost.
+  - Deploys are driven by the **Vercel GitHub App**, so `git push` to `main` ships.
+    Connecting the repo does NOT deploy pre-existing commits — it only builds the
+    *next* push, so after connecting, push something or hit Redeploy.
+  - Free tier cold-starts: a page untouched for days can take ~15s on first hit, then
+    is fast. Warm the link before sending it to someone.
+  - See [`../DEPLOY.md`](../DEPLOY.md) for the env-var table and a from-scratch setup.
 - **Prod hardening**: see [`../SECURITY.md`](../SECURITY.md) (re-enable email confirmation,
   consider rate-limiting `/api/*`). `npm audit` shows 2 moderate build-time postcss
   advisories via Next — deferred (fixing forces a Next upgrade off pinned 16.2.9).
