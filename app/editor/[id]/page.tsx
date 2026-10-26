@@ -151,8 +151,9 @@ function Editor({
   const photos = media.filter((m) => m.type === 'photo');
   const music = media.find((m) => m.type === 'music') ?? null;
   const video = media.find((m) => m.type === 'video') ?? null;
-  // Columns from migration 0004 are simply absent on older databases.
-  const hasExtras = initialProject.candle_count !== undefined;
+  // Columns from migration 0004 are simply absent on older databases. Key on
+  // wishes_enabled: candle_count already existed (hand-added) in production.
+  const hasExtras = initialProject.wishes_enabled !== undefined;
 
   function handleUploaded(item: ProjectMedia) {
     setMedia((m) =>
