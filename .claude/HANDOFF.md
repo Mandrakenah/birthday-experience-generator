@@ -40,13 +40,15 @@ Verified against a local `supabase start` stack (all migrations from scratch): e
 plus the same suite against the **pre-0004 schema** (everything works, Extras panel hidden),
 plus a password-reset round trip through Mailpit.
 
-**Owner TODO in the Supabase dashboard (can't be done from code):**
-1. SQL Editor → run `supabase/migrations/0004_reveal_candles_wishes.sql` (unlocks the
-   Extras panel: wishes, reveal date, candle count).
-2. Auth → URL Configuration → Site URL `https://birthday-experience-generator.vercel.app`,
-   Redirect URLs add `https://birthday-experience-generator.vercel.app/**` (needed for
-   password-reset / confirmation emails).
-3. Optional: turn "Confirm email" on.
+**Production Supabase — DONE 2026-10-26** (via the Management API):
+- Migration 0004 applied (in a transaction; data intact: 13 projects, 6 media).
+- Auth Site URL → `https://birthday-experience-generator.vercel.app`; Redirect URLs →
+  that origin `/**` plus `http://localhost:3000/**`.
+- "Confirm email" left OFF (owner's call; the app supports turning it on).
+- **Schema drift found:** prod had hand-added `candle_count` (INTEGER, nullable, default
+  5, CHECK 1–10) and `headline` (TEXT, default 'Happy Birthday') with no migration.
+  0004 is now idempotent and tolerates the former; `headline` is unused by the code and
+  was left alone. Prod still holds the old e2e/test users and projects listed above.
 
 ## FIRST STEPS on this (new) laptop — do these in order
 
