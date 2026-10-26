@@ -1,44 +1,10 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { motion } from 'framer-motion';
+import { motion, useReducedMotion } from 'framer-motion';
 import { cn } from '@/lib/utils/cn';
 
-// Spec 14.5, extended with onComplete so the Continue button can appear.
-function TypewriterText({
-  text,
-  speed = 40,
-  className,
-  onComplete,
-}: {
-  text: string;
-  speed?: number;
-  className?: string;
-  onComplete?: () => void;
-}) {
-  const [displayed, setDisplayed] = useState('');
-
-  useEffect(() => {
-    let i = 0;
-    const interval = setInterval(() => {
-      setDisplayed(text.slice(0, i + 1));
-      i++;
-      if (i >= text.length) {
-        clearInterval(interval);
-        onComplete?.();
-      }
-    }, speed);
-    return () => clearInterval(interval);
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- restart only when the text changes
-  }, [text, speed]);
-
-  return (
-    <p className={cn('text-2xl md:text-4xl font-light leading-relaxed', className)}>
-      {displayed}
-      <span className="inline-block w-0.5 h-6 ml-1 bg-current animate-pulse" />
-    </p>
-  );
-}
+const CHAR_MS = 40;
 
 interface MessageSceneProps {
   message: string;
@@ -46,19 +12,37 @@ interface MessageSceneProps {
   onComplete: () => void;
 }
 
-/** Typewriter personal message, then a Continue button (spec 17.2). */
+/**
+ * Typewriter personal message (spec 14.5), then a Continue button. Tapping
+ * the text shows it all at once — a 500-character message would otherwise
+ * take 20 seconds — and reduced-motion visitors get it immediately.
+ */
 export function MessageScene({ message, fontClass, onComplete }: MessageSceneProps) {
-  const [done, setDone] = useState(false);
   const text = message || 'Wishing you the happiest of birthdays!';
+  const reduceMotion = useReducedMotion();
+  const [count, setCount] = useState(0);
+  const done = reduceMotion || count >= text.length;
+
+  useEffect(() => {
+    if (done) return;
+    const timer = setTimeout(() => setCount((c) => c + 1), CHAR_MS);
+    return () => clearTimeout(timer);
+  }, [count, done]);
 
   return (
     <div className="flex min-h-screen flex-col items-center justify-center gap-10 px-6 py-16 text-center">
-      <TypewriterText
-        text={text}
-        className={cn('max-w-2xl whitespace-pre-wrap', fontClass)}
-        onComplete={() => setDone(true)}
-      />
-      {done && (
+      <p
+        onClick={() => setCount(text.length)}
+        className={cn(
+          'max-w-2xl whitespace-pre-wrap text-2xl font-light leading-relaxed md:text-4xl',
+          !done && 'cursor-pointer',
+          fontClass
+        )}
+      >
+        {done ? text : text.slice(0, count)}
+        {!done && <span className="ml-1 inline-block h-6 w-0.5 animate-pulse bg-current" />}
+      </p>
+      {done ? (
         <motion.button
           type="button"
           onClick={onComplete}
@@ -69,6 +53,8 @@ export function MessageScene({ message, fontClass, onComplete }: MessageScenePro
         >
           Continue →
         </motion.button>
+      ) : (
+        <p className="text-xs opacity-50">Tap the message to show it all</p>
       )}
     </div>
   );

@@ -32,10 +32,11 @@ export function MediaUploader({
 }: MediaUploaderProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [dragging, setDragging] = useState(false);
-  const { uploads, upload } = useUpload();
+  const { uploads, upload, clearFinished } = useUpload();
 
   async function handleFiles(fileList: FileList | null) {
     if (!fileList?.length) return;
+    clearFinished(); // drop the previous batch's errors
     const files = multiple ? Array.from(fileList) : [fileList[0]];
     for (let i = 0; i < files.length; i++) {
       const media = await upload({
@@ -66,7 +67,10 @@ export function MediaUploader({
         aria-label={`Upload ${TYPE_LABEL[type]}`}
         onClick={() => inputRef.current?.click()}
         onKeyDown={(e) => {
-          if (e.key === 'Enter' || e.key === ' ') inputRef.current?.click();
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault(); // Space would otherwise scroll the page
+            inputRef.current?.click();
+          }
         }}
         onDragOver={(e) => {
           e.preventDefault();

@@ -1,17 +1,9 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
-import type { BirthdayProject } from '@/types';
+import { LIMITS, isUuid, parseProjectUpdate } from '@/lib/utils/validation';
+import type { MediaType } from '@/types';
 
-// Fields a creator may change through this route. slug/status are managed
-// exclusively by /api/publish.
-const UPDATABLE_FIELDS = [
-  'recipient',
-  'theme',
-  'message',
-  'final_message',
-  'font_family',
-  'custom_theme',
-] as const;
+const MEDIA_FOLDERS: MediaType[] = ['photo', 'video', 'music'];
 
 export async function GET() {
   const supabase = await createClient();
@@ -42,10 +34,14 @@ export async function POST(request: Request) {
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   const body = await request.json().catch(() => ({}));
-  const recipient =
+  const fallback = user.user_metadata?.default_recipient;
+  const recipient = (
     typeof body.recipient === 'string' && body.recipient.trim()
       ? body.recipient.trim()
-      : ((user.user_metadata?.default_recipient as string | undefined) ?? '');
+      : typeof fallback === 'string'
+        ? fallback
+        : ''
+  ).slice(0, LIMITS.recipient);
 
   const { data, error } = await supabase
     .from('birthday_projects')
@@ -66,23 +62,20 @@ export async function PATCH(request: Request) {
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   const body = await request.json().catch(() => null);
-  if (!body?.id) {
+  if (!body || typeof body !== 'object' || !isUuid(body.id)) {
     return NextResponse.json({ error: 'Missing project id' }, { status: 400 });
   }
 
-  const updates: Partial<BirthdayProject> = {};
-  for (const field of UPDATABLE_FIELDS) {
-    if (field in body) updates[field] = body[field];
-  }
-  if (Object.keys(updates).length === 0) {
-    return NextResponse.json({ error: 'No updatable fields provided' }, { status: 400 });
-  }
+  // slug/status are managed exclusively by /api/publish and are not accepted here.
+  const parsed = parseProjectUpdate(body);
+  if ('error' in parsed) return NextResponse.json({ error: parsed.error }, { status: 400 });
 
-  // User-scoped client: RLS guarantees only the owner's row can match.
+  // creator_id filter + RLS: only the owner's row can match.
   const { data, error } = await supabase
     .from('birthday_projects')
-    .update(updates)
+    .update(parsed.updates)
     .eq('id', body.id)
+    .eq('creator_id', user.id)
     .select()
     .maybeSingle();
 
@@ -100,7 +93,7 @@ export async function DELETE(request: Request) {
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   const body = await request.json().catch(() => null);
-  if (!body?.id) {
+  if (!isUuid(body?.id)) {
     return NextResponse.json({ error: 'Missing project id' }, { status: 400 });
   }
 
@@ -108,11 +101,23 @@ export async function DELETE(request: Request) {
     .from('birthday_projects')
     .delete()
     .eq('id', body.id)
+    .eq('creator_id', user.id)
     .select('id')
     .maybeSingle();
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   if (!data) return NextResponse.json({ error: 'Not found' }, { status: 404 });
+
+  // The rows cascade, but Storage objects don't. Best-effort: a failure here
+  // only leaves orphaned files, never a broken project.
+  const bucket = supabase.storage.from('birthday-media');
+  await Promise.all(
+    MEDIA_FOLDERS.map(async (type) => {
+      const folder = `${user.id}/${data.id}/${type}`;
+      const { data: files } = await bucket.list(folder, { limit: 1000 });
+      if (files?.length) await bucket.remove(files.map((f) => `${folder}/${f.name}`));
+    })
+  );
 
   return NextResponse.json({ deleted: data.id });
 }

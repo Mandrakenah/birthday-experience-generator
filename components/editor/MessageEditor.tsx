@@ -1,45 +1,30 @@
 'use client';
 
 import { useId, useState } from 'react';
+import { useAutosave } from '@/lib/hooks/useAutosave';
 import { cn } from '@/lib/utils/cn';
 
 interface MessageEditorProps {
-  projectId: string;
-  field: 'message' | 'final_message';
   label: string;
   initialValue: string;
   maxLength: number;
+  rows?: number;
   placeholder?: string;
-  onSaveStart: () => void;
-  onSaveEnd: (ok: boolean) => void;
+  onSave: (value: string, keepalive: boolean) => Promise<boolean>;
 }
 
-/** Textarea with character count; auto-saves on blur via PATCH /api/projects (spec 5.1/12.3). */
+/** Textarea with character count; auto-saves while typing and on blur (spec 5.1/12.3). */
 export function MessageEditor({
-  projectId,
-  field,
   label,
   initialValue,
   maxLength,
+  rows = 3,
   placeholder,
-  onSaveStart,
-  onSaveEnd,
+  onSave,
 }: MessageEditorProps) {
   const id = useId();
   const [value, setValue] = useState(initialValue);
-  const [savedValue, setSavedValue] = useState(initialValue);
-
-  async function handleBlur() {
-    if (value === savedValue) return;
-    onSaveStart();
-    const res = await fetch('/api/projects', {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id: projectId, [field]: value }),
-    });
-    if (res.ok) setSavedValue(value);
-    onSaveEnd(res.ok);
-  }
+  const flush = useAutosave(value, onSave, 1000);
 
   return (
     <div className="flex flex-col gap-1.5">
@@ -51,9 +36,9 @@ export function MessageEditor({
         value={value}
         maxLength={maxLength}
         placeholder={placeholder}
-        rows={field === 'message' ? 5 : 3}
+        rows={rows}
         onChange={(e) => setValue(e.target.value)}
-        onBlur={() => void handleBlur()}
+        onBlur={() => flush()}
         className="rounded-lg border border-gray-300 bg-white p-3 text-base text-gray-900 outline-none transition-colors focus:border-violet-500 focus:ring-2 focus:ring-violet-200"
       />
       <p

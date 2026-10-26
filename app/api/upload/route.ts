@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { LIMITS, isUuid } from '@/lib/utils/validation';
 
 const MEDIA_TYPES = ['photo', 'video', 'music'] as const;
 
@@ -16,12 +17,20 @@ export async function POST(request: Request) {
   const body = await request.json().catch(() => null);
   const { projectId, storagePath, type, caption = '', sortOrder = 0 } = body ?? {};
 
-  if (!projectId || !storagePath || !MEDIA_TYPES.includes(type)) {
+  if (
+    !isUuid(projectId) ||
+    typeof storagePath !== 'string' ||
+    !MEDIA_TYPES.includes(type) ||
+    typeof caption !== 'string' ||
+    !Number.isInteger(sortOrder)
+  ) {
     return NextResponse.json({ error: 'Invalid payload' }, { status: 400 });
   }
   // The storage policies scope uploads to the creator's folder; reject rows
-  // pointing at paths the caller doesn't own.
-  if (!String(storagePath).startsWith(`${user.id}/${projectId}/`)) {
+  // pointing at paths the caller doesn't own (buildStoragePath's exact shape,
+  // so no `..` segments either).
+  const [owner, project_, folder, file, ...rest] = storagePath.split('/');
+  if (owner !== user.id || project_ !== projectId || folder !== type || !file || rest.length) {
     return NextResponse.json({ error: 'Invalid storage path' }, { status: 400 });
   }
 
@@ -70,7 +79,7 @@ export async function POST(request: Request) {
       type,
       storage_path: storagePath,
       public_url: publicUrl,
-      caption,
+      caption: caption.slice(0, LIMITS.caption),
       sort_order: sortOrder,
     })
     .select()

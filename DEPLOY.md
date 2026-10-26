@@ -2,8 +2,11 @@
 
 The app is a standard Next.js 16 app. It **builds with no environment variables**, but at
 runtime it needs a Supabase project for auth, data, and media. Set Supabase up first using
-[`supabase/SETUP.md`](./supabase/SETUP.md) (run migrations `0001`–`0003`, create the public
-`birthday-media` bucket, enable Email auth).
+[`supabase/SETUP.md`](./supabase/SETUP.md) (run migrations `0001`–`0004`, enable Email auth,
+set the auth Site URL / Redirect URLs).
+
+> **Production today** is the Vercel project `birthday-experience-generator` (team
+> `mandrakenahs-projects`). The Vercel GitHub App deploys every push to `main`.
 
 ## Environment variables (all hosts)
 
@@ -48,7 +51,8 @@ to `main` and on PRs. It needs no secrets because the build is keyless.
 ## Pre-deploy checklist
 
 - [ ] `npm run verify` passes locally.
-- [ ] Supabase migrations `0001`–`0003` run; `birthday-media` bucket is public; Email auth on.
+- [ ] Supabase migrations `0001`–`0004` run; `birthday-media` bucket is public; Email auth on.
+- [ ] Supabase Auth → URL Configuration: Site URL + Redirect URLs include the deployed origin.
 - [ ] All four env vars set on the host (service-role key kept server-side).
 - [ ] `NEXT_PUBLIC_APP_URL` matches the real deployed origin.
 - [ ] Open a published `/b/[slug]` in an incognito window to confirm the public experience renders.

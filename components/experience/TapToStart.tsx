@@ -5,11 +5,13 @@ import { GiftIcon } from '@/components/ui/icons';
 
 interface TapToStartProps {
   recipient: string;
+  /** A refresh interrupted the experience — the tap continues where it was. */
+  resuming: boolean;
   onStart: () => void;
 }
 
 /** Initial tap gate — the user gesture that unlocks audio autoplay (spec 5.2). */
-export function TapToStart({ recipient, onStart }: TapToStartProps) {
+export function TapToStart({ recipient, resuming, onStart }: TapToStartProps) {
   return (
     <button
       type="button"
@@ -32,8 +34,9 @@ export function TapToStart({ recipient, onStart }: TapToStartProps) {
         animate={{ scale: [1, 1.06, 1] }}
         transition={{ duration: 1.2, repeat: Infinity, ease: 'easeInOut' }}
       >
-        Tap to begin
+        {resuming ? 'Tap to continue' : 'Tap to begin'}
       </motion.span>
+      <span className="text-sm opacity-60">Turn your sound on</span>
     </button>
   );
 }

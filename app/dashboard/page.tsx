@@ -13,6 +13,8 @@ export default function DashboardPage() {
   const router = useRouter();
   const [email, setEmail] = useState<string | null>(null);
   const [projects, setProjects] = useState<BirthdayProject[]>([]);
+  const [views, setViews] = useState<Record<string, number>>({});
+  const [loadedAt, setLoadedAt] = useState(0);
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -33,15 +35,38 @@ export default function DashboardPage() {
       }
       setEmail(user.email ?? null);
 
+      // creator_id filter is required: RLS also lets everyone read every
+      // *published* project, so a bare select lists strangers' pages here.
       const { data, error: listError } = await supabase
         .from('birthday_projects')
         .select('*')
+        .eq('creator_id', user.id)
         .order('updated_at', { ascending: false });
       if (cancelled) return;
 
-      if (listError) setError(listError.message);
-      else setProjects(data as BirthdayProject[]);
+      if (listError) {
+        setError(listError.message);
+        setLoading(false);
+        return;
+      }
+      const list = data as BirthdayProject[];
+      setProjects(list);
+      setLoadedAt(Date.now());
       setLoading(false);
+
+      // View counts are a nice-to-have; failures just leave them blank.
+      const counts = await Promise.all(
+        list
+          .filter((p) => p.slug)
+          .map(async (p) => {
+            const { count } = await supabase
+              .from('experience_views')
+              .select('id', { count: 'exact', head: true })
+              .eq('project_id', p.id);
+            return [p.id, count ?? 0] as const;
+          })
+      );
+      if (!cancelled) setViews(Object.fromEntries(counts));
     }
 
     void load();
@@ -53,14 +78,15 @@ export default function DashboardPage() {
   async function handleNew() {
     setCreating(true);
     setError(null);
-    const res = await fetch('/api/projects', { method: 'POST' });
-    const json = await res.json();
-    if (!res.ok) {
-      setError(json.error ?? 'Could not create project');
+    try {
+      const res = await fetch('/api/projects', { method: 'POST' });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error ?? 'Could not create project');
+      router.push(`/editor/${json.project.id}`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not create project');
       setCreating(false);
-      return;
     }
-    router.push(`/editor/${json.project.id}`);
   }
 
   async function handleDelete(id: string) {
@@ -73,10 +99,10 @@ export default function DashboardPage() {
       method: 'DELETE',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ id }),
-    });
-    if (!res.ok) {
+    }).catch(() => null);
+    if (!res?.ok) {
       setProjects(previous);
-      const json = await res.json().catch(() => null);
+      const json = await res?.json().catch(() => null);
       setError(json?.error ?? 'Could not delete project');
     }
   }
@@ -148,7 +174,13 @@ export default function DashboardPage() {
         ) : (
           <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {projects.map((project) => (
-              <ProjectCard key={project.id} project={project} onDelete={handleDelete} />
+              <ProjectCard
+                key={project.id}
+                project={project}
+                views={views[project.id]}
+                now={loadedAt}
+                onDelete={handleDelete}
+              />
             ))}
           </div>
         )}

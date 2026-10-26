@@ -5,31 +5,14 @@ import { cn } from '@/lib/utils/cn';
 import type { ThemeName } from '@/types';
 
 interface ThemePickerProps {
-  projectId: string;
   value: ThemeName;
   onChange: (theme: ThemeName) => void;
-  onSaveStart: () => void;
-  onSaveEnd: (ok: boolean) => void;
 }
 
-/** Theme chips (spec 5.1) + a "Custom" chip; persists project.theme on click. */
-export function ThemePicker({
-  projectId,
-  value,
-  onChange,
-  onSaveStart,
-  onSaveEnd,
-}: ThemePickerProps) {
-  async function handlePick(theme: ThemeName) {
-    if (theme === value) return;
-    onChange(theme);
-    onSaveStart();
-    const res = await fetch('/api/projects', {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id: projectId, theme }),
-    });
-    onSaveEnd(res.ok);
+/** Theme chips (spec 5.1) + a "Custom" chip; the parent persists the pick. */
+export function ThemePicker({ value, onChange }: ThemePickerProps) {
+  function handlePick(theme: ThemeName) {
+    if (theme !== value) onChange(theme);
   }
 
   return (

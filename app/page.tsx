@@ -1,6 +1,13 @@
 import Link from 'next/link';
 import type { ComponentType, SVGProps } from 'react';
-import { CakeIcon, CameraIcon, MicIcon, SparklesIcon } from '@/components/ui/icons';
+import {
+  CakeIcon,
+  CameraIcon,
+  ClockIcon,
+  MessageHeartIcon,
+  MicIcon,
+  SparklesIcon,
+} from '@/components/ui/icons';
 import { PhonePreview } from '@/components/marketing/PhonePreview';
 
 const FEATURES: Array<{
@@ -11,7 +18,12 @@ const FEATURES: Array<{
   {
     Icon: CameraIcon,
     title: 'Their memories, beautifully told',
-    body: 'Upload photos and watch them become a cinematic slideshow with music.',
+    body: 'Upload photos with captions and watch them become a cinematic slideshow with music.',
+  },
+  {
+    Icon: MessageHeartIcon,
+    title: 'Wishes from everyone',
+    body: 'Send friends and family an invite link — their messages appear as a wall of love.',
   },
   {
     Icon: MicIcon,
@@ -19,10 +31,26 @@ const FEATURES: Array<{
     body: 'They blow into their microphone and the candles go out, one by one.',
   },
   {
+    Icon: ClockIcon,
+    title: 'Unlocks at midnight',
+    body: 'Share the link early. Until the moment you pick, it shows a countdown.',
+  },
+  {
     Icon: SparklesIcon,
     title: 'Fireworks finale',
     body: 'A burst of fireworks and one last heartfelt message they will remember.',
   },
+  {
+    Icon: CakeIcon,
+    title: 'Make it yours',
+    body: 'Seven themes, or build your own with colors, a background photo and stickers.',
+  },
+];
+
+const STEPS = [
+  { title: 'Create', body: 'Add their name, your photos, a song and a message.' },
+  { title: 'Personalize', body: 'Pick a theme, invite friends to add wishes, set the unlock time.' },
+  { title: 'Share', body: 'Publish and send one link. No app or login on their side.' },
 ];
 
 // Marketing landing page (spec 6.1) — public, sign-up CTA. Product-first showcase:
@@ -92,20 +120,64 @@ export default function LandingPage() {
         <PhonePreview />
       </section>
 
-      <section
-        id="features"
-        className="relative mx-auto grid w-full max-w-5xl grid-cols-1 gap-4 px-4 pb-20 sm:grid-cols-3"
-      >
-        {FEATURES.map(({ Icon, title, body }) => (
-          <div key={title} className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-            <span className="inline-flex size-11 items-center justify-center rounded-xl bg-violet-100 text-violet-600">
-              <Icon className="size-6" />
-            </span>
-            <h2 className="mt-3 text-lg font-semibold text-slate-900">{title}</h2>
-            <p className="mt-1 text-sm text-slate-600">{body}</p>
-          </div>
-        ))}
+      <section id="features" className="relative mx-auto w-full max-w-5xl px-4 pb-20">
+        <h2 className="text-center text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">
+          Everything a birthday deserves
+        </h2>
+        <div className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {FEATURES.map(({ Icon, title, body }) => (
+            <div key={title} className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+              <span className="inline-flex size-11 items-center justify-center rounded-xl bg-violet-100 text-violet-600">
+                <Icon className="size-6" />
+              </span>
+              <h3 className="mt-3 text-lg font-semibold text-slate-900">{title}</h3>
+              <p className="mt-1 text-sm text-slate-600">{body}</p>
+            </div>
+          ))}
+        </div>
       </section>
+
+      <section className="relative border-y border-slate-200 bg-slate-50">
+        <div className="mx-auto w-full max-w-5xl px-4 py-16">
+          <h2 className="text-center text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">
+            Ready in minutes
+          </h2>
+          <ol className="mt-8 grid grid-cols-1 gap-6 sm:grid-cols-3">
+            {STEPS.map((step, i) => (
+              <li key={step.title} className="flex flex-col items-center text-center">
+                <span className="flex size-10 items-center justify-center rounded-full bg-violet-600 text-base font-bold text-white">
+                  {i + 1}
+                </span>
+                <h3 className="mt-3 text-lg font-semibold text-slate-900">{step.title}</h3>
+                <p className="mt-1 max-w-xs text-sm text-slate-600">{step.body}</p>
+              </li>
+            ))}
+          </ol>
+          <div className="mt-10 flex justify-center">
+            <Link
+              href="/signup"
+              className="flex h-12 items-center rounded-full bg-violet-600 px-7 text-base font-semibold text-white shadow-lg shadow-violet-600/25 hover:bg-violet-500"
+            >
+              Start your first surprise →
+            </Link>
+          </div>
+        </div>
+      </section>
+
+      <footer className="relative mx-auto flex w-full max-w-6xl flex-wrap items-center justify-between gap-3 px-4 py-8 text-sm text-slate-500">
+        <span className="inline-flex items-center gap-2">
+          <CakeIcon className="size-4 text-violet-600" />
+          Birthday Experience
+        </span>
+        <nav className="flex gap-4">
+          <Link href="/login" className="hover:text-slate-900">
+            Log in
+          </Link>
+          <Link href="/signup" className="hover:text-slate-900">
+            Sign up
+          </Link>
+        </nav>
+      </footer>
     </main>
   );
 }

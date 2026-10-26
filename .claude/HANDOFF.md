@@ -16,7 +16,37 @@ machine. It travels with the repo (the chat-based memory does NOT).
   signup → create → upload → publish → anonymous `/b/<slug>`, plus cross-account
   isolation. Re-run with `.claude/skills/run-birthday-experience-generator/e2e.py`.
 - Repo is live at https://github.com/Mandrakenah/birthday-experience-generator (public, MIT).
-- Next up: deploy (`DEPLOY.md`) and prod hardening (`SECURITY.md`).
+
+## 2026-10-26 production-hardening pass
+
+Fixes: dashboard listed **other users' published cards** (browser query lacked the
+`creator_id` filter — same OR'd-RLS trap as before; e2e now checks the dashboard UI);
+editor loaded others' published projects; `custom_theme` colors/bg URL allowed CSS
+`url()` injection → recipient tracking (now sanitized on write + render); text only saved
+on blur (now autosave + flush on unload); photo delete invisible / reorder impossible on
+touch; deleting a project orphaned its Storage files; publish/upload/PATCH input
+validation; proxy dropped refreshed cookies on redirect; body font was Arial, not Geist;
+script font fell back to Comic Sans on phones (now self-hosted Dancing Script/Playfair).
+Removed unused `/api/slug`.
+
+Features: password reset + email-confirmation support (`/auth/callback`), `?next=`
+after login, friends' wishes (`/wish/[id]`, `/api/wishes`, Wishes scene), scheduled
+reveal with server-side countdown, candle count, photo captions, music/video remove +
+previews, view counts on the dashboard, share sheet/WhatsApp/email, OG link previews,
+mute button, tap-to-skip, "Watch again", reduced-motion support, robots/sitemap,
+security headers, app icon.
+
+Verified against a local `supabase start` stack (all migrations from scratch): e2e 30/30,
+plus the same suite against the **pre-0004 schema** (everything works, Extras panel hidden),
+plus a password-reset round trip through Mailpit.
+
+**Owner TODO in the Supabase dashboard (can't be done from code):**
+1. SQL Editor → run `supabase/migrations/0004_reveal_candles_wishes.sql` (unlocks the
+   Extras panel: wishes, reveal date, candle count).
+2. Auth → URL Configuration → Site URL `https://birthday-experience-generator.vercel.app`,
+   Redirect URLs add `https://birthday-experience-generator.vercel.app/**` (needed for
+   password-reset / confirmation emails).
+3. Optional: turn "Confirm email" on.
 
 ## FIRST STEPS on this (new) laptop — do these in order
 

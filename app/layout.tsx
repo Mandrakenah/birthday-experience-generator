@@ -1,5 +1,5 @@
-import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import type { Metadata, Viewport } from "next";
+import { Dancing_Script, Geist, Playfair_Display } from "next/font/google";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -7,30 +7,50 @@ const geistSans = Geist({
   subsets: ["latin"],
 });
 
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
+// Message fonts for the recipient experience (font_family serif / script).
+// Not preloaded: most pages never use them.
+const playfair = Playfair_Display({
+  variable: "--font-playfair",
   subsets: ["latin"],
+  preload: false,
 });
 
-const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
+const dancing = Dancing_Script({
+  variable: "--font-dancing",
+  subsets: ["latin"],
+  preload: false,
+});
+
+const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
 const description =
-  "Create personalized, cinematic birthday websites — photos, music, video, and an interactive candle-blowing finale.";
+  "Create personalized, cinematic birthday websites — photos, music, video, friends' wishes, and an interactive candle-blowing finale.";
 
 export const metadata: Metadata = {
   metadataBase: new URL(appUrl),
-  title: "Birthday Experience Generator",
+  title: {
+    default: "Birthday Experience — cinematic birthday surprises",
+    template: "%s · Birthday Experience",
+  },
   description,
+  applicationName: "Birthday Experience",
   openGraph: {
-    title: "Birthday Experience Generator",
+    title: "Birthday Experience — cinematic birthday surprises",
     description,
     type: "website",
     url: appUrl,
+    siteName: "Birthday Experience",
   },
   twitter: {
     card: "summary_large_image",
-    title: "Birthday Experience Generator",
+    title: "Birthday Experience",
     description,
   },
+};
+
+export const viewport: Viewport = {
+  themeColor: "#7c3aed",
+  width: "device-width",
+  initialScale: 1,
 };
 
 export default function RootLayout({
@@ -41,7 +61,7 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+      className={`${geistSans.variable} ${playfair.variable} ${dancing.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">{children}</body>
     </html>

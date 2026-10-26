@@ -106,10 +106,19 @@ export function useMicrophone({
 
       frameRef.current = requestAnimationFrame(detect);
     } catch (err) {
+      // Release a stream that was granted before the audio setup failed, or
+      // the browser keeps showing its recording indicator.
+      stopListening();
       setHasPermission(false);
-      setError(err instanceof Error ? err.message : 'Microphone access denied');
+      setError(
+        err instanceof Error && err.name === 'NotAllowedError'
+          ? 'permission was denied'
+          : err instanceof Error
+            ? err.message
+            : 'Microphone access denied'
+      );
     }
-  }, [blowThreshold, sustainMs]);
+  }, [blowThreshold, sustainMs, stopListening]);
 
   useEffect(() => () => stopListening(), [stopListening]);
 

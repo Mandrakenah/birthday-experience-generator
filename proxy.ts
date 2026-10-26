@@ -37,18 +37,34 @@ export async function proxy(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser();
 
-  const protectedPaths = ['/dashboard', '/editor'];
-  const isProtected = protectedPaths.some((p) => request.nextUrl.pathname.startsWith(p));
+  const { pathname, search } = request.nextUrl;
 
-  if (isProtected && !user) {
+  // A redirect is a new response, so the refreshed session cookies written to
+  // supabaseResponse must be copied across or the rotation is lost.
+  const redirect = (path: string, next?: string) => {
     const url = request.nextUrl.clone();
-    url.pathname = '/login';
-    return NextResponse.redirect(url);
+    url.pathname = path;
+    url.search = next ? `?next=${encodeURIComponent(next)}` : '';
+    const response = NextResponse.redirect(url);
+    supabaseResponse.cookies.getAll().forEach((cookie) => response.cookies.set(cookie));
+    return response;
+  };
+
+  const protectedPaths = ['/dashboard', '/editor'];
+  if (!user && protectedPaths.some((p) => pathname.startsWith(p))) {
+    return redirect('/login', pathname + search);
+  }
+
+  // Already signed in — the auth forms have nothing to offer.
+  if (user && (pathname === '/login' || pathname === '/signup')) {
+    return redirect('/dashboard');
   }
 
   return supabaseResponse;
 }
 
 export const config = {
-  matcher: ['/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)'],
+  matcher: [
+    '/((?!_next/static|_next/image|favicon.ico|icon.svg|robots.txt|sitemap.xml|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
+  ],
 };

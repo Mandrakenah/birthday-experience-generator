@@ -7,6 +7,11 @@
 -- File path convention: {auth_user_id}/{project_id}/{type}/{filename}
 -- ============================================================
 
+-- Creates the bucket if the dashboard step was skipped (no-op otherwise).
+INSERT INTO storage.buckets (id, name, public, file_size_limit)
+VALUES ('birthday-media', 'birthday-media', true, 209715200)
+ON CONFLICT (id) DO NOTHING;
+
 -- Authenticated users can upload to their own folder
 CREATE POLICY "Authenticated uploads to own folder"
   ON storage.objects FOR INSERT

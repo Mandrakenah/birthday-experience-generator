@@ -13,9 +13,14 @@ interface PhotoSlideshowProps {
   onComplete: () => void;
 }
 
-/** Auto-advancing carousel with Ken Burns crossfades (spec 5.2/17.2). */
+/** Auto-advancing carousel with Ken Burns crossfades (spec 5.2/17.2); tap skips ahead. */
 export function PhotoSlideshow({ photos, onComplete }: PhotoSlideshowProps) {
   const [index, setIndex] = useState(0);
+
+  const next = () => {
+    if (index + 1 >= photos.length) onComplete();
+    else setIndex(index + 1);
+  };
 
   useEffect(() => {
     const timer = setTimeout(
@@ -27,6 +32,12 @@ export function PhotoSlideshow({ photos, onComplete }: PhotoSlideshowProps) {
     );
     return () => clearTimeout(timer);
   }, [index, photos.length, onComplete]);
+
+  // Warm the cache for the next slide so the crossfade never shows a blank.
+  useEffect(() => {
+    const upcoming = photos[index + 1];
+    if (upcoming) new Image().src = upcoming.public_url;
+  }, [index, photos]);
 
   // Spec 20.1: no photos → single placeholder slide.
   if (photos.length === 0) {
@@ -43,7 +54,12 @@ export function PhotoSlideshow({ photos, onComplete }: PhotoSlideshowProps) {
   const drift = index % 2 === 0 ? 24 : -24;
 
   return (
-    <div className="relative min-h-screen w-full overflow-hidden bg-black">
+    <button
+      type="button"
+      onClick={next}
+      aria-label={`Photo ${index + 1} of ${photos.length}. Tap for the next one.`}
+      className="relative block min-h-screen w-full cursor-pointer overflow-hidden bg-black"
+    >
       <AnimatePresence>
         <motion.div
           key={photo.id}
@@ -64,10 +80,13 @@ export function PhotoSlideshow({ photos, onComplete }: PhotoSlideshowProps) {
         </motion.div>
       </AnimatePresence>
 
+      {/* scrim keeps captions readable on bright photos */}
+      <div className="pointer-events-none absolute inset-x-0 bottom-0 h-40 bg-gradient-to-t from-black/60 to-transparent" />
+
       {photo.caption && (
         <motion.p
           key={`caption-${photo.id}`}
-          className="absolute inset-x-0 bottom-16 px-6 text-center text-lg font-medium text-white drop-shadow-md sm:text-2xl"
+          className="absolute inset-x-0 bottom-20 px-6 text-center text-lg font-medium text-white drop-shadow-md sm:text-2xl"
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.5, duration: 0.6 }}
@@ -76,7 +95,7 @@ export function PhotoSlideshow({ photos, onComplete }: PhotoSlideshowProps) {
         </motion.p>
       )}
 
-      <div className="absolute inset-x-0 bottom-6 flex justify-center gap-1.5">
+      <div className="absolute inset-x-0 bottom-11 flex justify-center gap-1.5">
         {photos.map((p, i) => (
           <span
             key={p.id}
@@ -86,6 +105,6 @@ export function PhotoSlideshow({ photos, onComplete }: PhotoSlideshowProps) {
           />
         ))}
       </div>
-    </div>
+    </button>
   );
 }

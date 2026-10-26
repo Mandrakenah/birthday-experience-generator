@@ -4,7 +4,7 @@ import { use, useEffect, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { ExperienceShell } from '@/components/experience/ExperienceShell';
 import { Spinner } from '@/components/ui/Spinner';
-import type { BirthdayProject, ExperienceData, ProjectMedia } from '@/types';
+import type { BirthdayProject, ExperienceData, ProjectMedia, ProjectWish } from '@/types';
 
 /**
  * Owner-only live preview (proxy protects /editor/*). Renders the same
@@ -34,12 +34,24 @@ export default function PreviewPage({ params }: { params: Promise<{ id: string }
         setMissing(true);
         return;
       }
+      // project_wishes only exists once migration 0004 has run (which also
+      // adds wishes_enabled) — don't query a missing table.
+      const { data: wishes } =
+        project.wishes_enabled === undefined
+          ? { data: [] }
+          : await supabase
+              .from('project_wishes')
+              .select('*')
+              .eq('project_id', id)
+              .order('created_at', { ascending: true });
+      if (cancelled) return;
       const rows = (media as ProjectMedia[]) ?? [];
       setData({
         project: project as BirthdayProject,
         photos: rows.filter((m) => m.type === 'photo'),
         video: rows.find((m) => m.type === 'video') ?? null,
         music: rows.find((m) => m.type === 'music') ?? null,
+        wishes: (wishes as ProjectWish[] | null) ?? [],
       });
     }
 

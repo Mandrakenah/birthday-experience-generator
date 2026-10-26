@@ -1,9 +1,11 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 import { STICKERS, STICKER_KINDS } from '@/components/experience/Stickers';
+import { useAutosave } from '@/lib/hooks/useAutosave';
 import { createClient } from '@/lib/supabase/client';
-import { buildStoragePath, validateFile } from '@/lib/utils/uploadHelpers';
+import { acceptForType, buildStoragePath, validateFile } from '@/lib/utils/uploadHelpers';
+import { LIMITS } from '@/lib/utils/validation';
 import { fontClasses } from '@/lib/utils/themes';
 import { cn } from '@/lib/utils/cn';
 import type { CustomSticker, CustomTheme, FontFamily, StickerKind } from '@/types';
@@ -12,8 +14,7 @@ interface CustomThemeEditorProps {
   projectId: string;
   recipient: string;
   initial: CustomTheme;
-  onSaveStart: () => void;
-  onSaveEnd: (ok: boolean) => void;
+  onSave: (theme: CustomTheme, keepalive: boolean) => Promise<boolean>;
 }
 
 const FONTS: Array<{ value: FontFamily; label: string }> = [
@@ -57,8 +58,7 @@ export function CustomThemeEditor({
   projectId,
   recipient,
   initial,
-  onSaveStart,
-  onSaveEnd,
+  onSave,
 }: CustomThemeEditorProps) {
   const [ct, setCt] = useState<CustomTheme>(initial);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -67,34 +67,10 @@ export function CustomThemeEditor({
 
   const canvasRef = useRef<HTMLDivElement>(null);
   const dragId = useRef<string | null>(null);
-  const firstRender = useRef(true);
 
-  // The parent recreates onSaveStart/onSaveEnd on every render and both call
-  // setState, so depending on them directly re-arms the save effect after each
-  // save — an endless PATCH loop. Read them through a ref and key the effect on
-  // the data alone.
-  const callbacks = useRef({ onSaveStart, onSaveEnd });
-  useEffect(() => {
-    callbacks.current = { onSaveStart, onSaveEnd };
-  });
-
-  // Debounced auto-save of the whole custom_theme blob.
-  useEffect(() => {
-    if (firstRender.current) {
-      firstRender.current = false;
-      return;
-    }
-    const timer = setTimeout(async () => {
-      callbacks.current.onSaveStart();
-      const res = await fetch('/api/projects', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: projectId, custom_theme: ct }),
-      });
-      callbacks.current.onSaveEnd(res.ok);
-    }, 700);
-    return () => clearTimeout(timer);
-  }, [ct, projectId]);
+  // Debounced auto-save of the whole custom_theme blob (flushed on unmount,
+  // e.g. when switching back to a preset theme mid-edit).
+  useAutosave(ct, onSave, 700);
 
   // Drag via pointer capture on the sticker itself — events keep coming even
   // when the pointer leaves the element, so no window listeners are needed.
@@ -127,6 +103,7 @@ export function CustomThemeEditor({
   const patch = (changes: Partial<CustomTheme>) => setCt((prev) => ({ ...prev, ...changes }));
 
   function addSticker(kind: StickerKind) {
+    if (ct.stickers.length >= LIMITS.stickers) return;
     const sticker: CustomSticker = {
       id: crypto.randomUUID(),
       kind,
@@ -314,7 +291,7 @@ export function CustomThemeEditor({
         <span className="text-sm font-medium text-gray-700">Background photo</span>
         <input
           type="file"
-          accept="image/*"
+          accept={acceptForType('photo')}
           onChange={onBgImage}
           disabled={bgBusy}
           className="text-sm text-gray-600 file:mr-2 file:rounded file:border-0 file:bg-violet-100 file:px-3 file:py-1.5 file:text-violet-700 disabled:opacity-50"

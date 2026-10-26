@@ -30,11 +30,11 @@ export function PublishToggle({
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ projectId, publish: !isPublished }),
-    });
-    const json = await res.json();
+    }).catch(() => null);
+    const json = await res?.json().catch(() => null);
     setBusy(false);
-    if (!res.ok) {
-      setError(json.error ?? 'Something went wrong');
+    if (!res?.ok) {
+      setError(json?.error ?? 'Could not reach the server — check your connection');
       return;
     }
     if (json.status === 'published') onPublished(json.slug, json.url);

@@ -64,6 +64,20 @@ export interface BirthdayProject {
   custom_theme: CustomTheme | null;
   created_at: string;
   updated_at: string;
+  // Added by migration 0004. Absent (undefined) on databases that have not run
+  // it yet — the editor hides the matching controls in that case.
+  reveal_at?: string | null;
+  candle_count?: number;
+  wishes_enabled?: boolean;
+}
+
+/** A short message a friend left via /wish/[id] (migration 0004). */
+export interface ProjectWish {
+  id: string;
+  project_id: string;
+  author_name: string;
+  message: string;
+  created_at: string;
 }
 
 export interface ProjectMedia {
@@ -82,6 +96,7 @@ export interface ExperienceData {
   photos: ProjectMedia[];
   video: ProjectMedia | null;
   music: ProjectMedia | null;
+  wishes: ProjectWish[];
 }
 
 export type SceneId =
@@ -89,6 +104,7 @@ export type SceneId =
   | 'welcome'
   | 'slideshow'
   | 'message'
+  | 'wishes'
   | 'video'
   | 'cake'
   | 'fireworks'

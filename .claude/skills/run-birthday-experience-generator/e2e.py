@@ -20,10 +20,25 @@ STAMP = os.environ.get("E2E_STAMP") or str(int(time.time()))
 EMAIL = "e2e-%s@example.com" % STAMP
 PW = "hunter2hunter2"
 RECIPIENT = "Mom"
-PHOTO = os.environ.get("E2E_PHOTO") or 'C:/Users/arjun/AppData/Local/Temp/claude/c--Users-arjun-OneDrive-Desktop-Birthday-App-birthday-experience-generator/bac1a72b-d2f6-4eda-bf13-88783d7355ba/scratchpad/e2e-photo.jpg'
+CAPTION = "Beach day %s" % STAMP
+WISH = "Have the best day ever %s" % STAMP
+PHOTO = os.environ.get("E2E_PHOTO") or ""
 
 failures = []
 
+
+def anon_html(browser, path):
+    """Server-rendered HTML of `path` for a visitor with no cookies.
+
+    Client component props (the experience data) are serialized into it, so
+    this shows exactly what a recipient's browser receives.
+    """
+    ctx = browser.new_context()
+    page = ctx.new_page()
+    page.goto(BASE + path, wait_until="networkidle", timeout=60000)
+    html = page.content()
+    ctx.close()
+    return html
 
 
 def ensure_photo():
@@ -32,7 +47,7 @@ def ensure_photo():
     Committed harness must not depend on a file in someone's temp dir.
     """
     p = Path(PHOTO)
-    if p.exists():
+    if PHOTO and p.exists():
         return str(p)
     p = SHOTS / "e2e-photo.jpg"
     SHOTS.mkdir(parents=True, exist_ok=True)
@@ -118,6 +133,12 @@ def main():
                 break
             pg.wait_for_timeout(2000)
         check("photo uploaded to Storage + project_media row", uploaded)
+        photo_url = pg.locator("ol img").first.get_attribute("src") if uploaded else None
+        cap = pg.get_by_placeholder("Add a caption (optional)")
+        if cap.count():
+            cap.first.fill(CAPTION)
+            cap.first.press("Enter")  # blurs -> saves
+            pg.wait_for_timeout(1500)
         save(pg, "e2e-03-filled.png")
 
         theme_btn = pg.get_by_role("button", name="Sweetheart")
@@ -181,6 +202,88 @@ def main():
         ids = [x.get("id") for x in r2.json().get("projects", [])] if r2.ok else []
         check("account B cannot see account A's project via /api/projects",
               project_id not in ids, "B sees %d project(s)" % len(ids))
+        # The dashboard queries Supabase directly from the browser, not via
+        # /api/projects - it leaked published projects before. Check the UI.
+        pg2.wait_for_selector("text=No birthday experiences yet", timeout=30000)
+        check("account B's dashboard UI lists none of A's projects",
+              CAPTION not in pg2.content() and "/editor/%s" % project_id not in pg2.content())
+        r = pg2.request.patch(BASE + "/api/projects",
+                              data={"id": project_id, "recipient": "hijacked"})
+        check("account B cannot PATCH A's project", r.status == 404, str(r.status))
+        pg2.context.close()
+
+        print("7. caption persisted and served to the recipient")
+        if slug:
+            html = anon_html(b, "/b/%s" % slug)
+            check("caption in published page data", CAPTION in html)
+
+        print("8. friends' wishes: enable, submit anonymously, appear in the experience")
+        pg.goto("%s/editor/%s" % (BASE, project_id), wait_until="networkidle", timeout=60000)
+        ws = pg.get_by_role("switch", name="Collect wishes from friends")
+        has_extras = ws.count() > 0
+        check("extras panel present (migration 0004 applied)", has_extras)
+        if has_extras and slug:
+            ws.first.click()
+            pg.wait_for_timeout(2500)
+            anon = b.new_context()
+            wp = anon.new_page()
+            wp.goto("%s/wish/%s" % (BASE, project_id), wait_until="networkidle", timeout=60000)
+            wp.get_by_label("Your name").fill("Auntie E2E")
+            wp.get_by_label("Your wish").fill(WISH)
+            wp.get_by_role("button", name="Send my wish").click()
+            wp.wait_for_selector("text=Your wish is in!", timeout=30000)
+            check("wish submitted via /wish/<id>", True)
+            anon.close()
+            check("wish appears in published page data", WISH in anon_html(b, "/b/%s" % slug))
+
+            r = pg.request.post(BASE + "/api/wishes", data={
+                "projectId": project_id, "name": "x", "message": "y" * 500})
+            check("over-long wish rejected", r.status == 400, str(r.status))
+
+        print("9. scheduled reveal withholds the content until it's time")
+        if has_extras and slug:
+            from datetime import datetime, timedelta, timezone
+            future = (datetime.now(timezone.utc) + timedelta(days=2)).isoformat()
+            r = pg.request.patch(BASE + "/api/projects",
+                                 data={"id": project_id, "reveal_at": future})
+            check("reveal_at saved", r.ok, str(r.status))
+            html = anon_html(b, "/b/%s" % slug)
+            check("countdown shown before reveal", "It unlocks in" in html)
+            check("photos/messages not sent before reveal",
+                  photo_url not in html and CAPTION not in html and WISH not in html)
+            pg.request.patch(BASE + "/api/projects", data={"id": project_id, "reveal_at": None})
+            check("experience back after clearing reveal",
+                  CAPTION in anon_html(b, "/b/%s" % slug))
+
+        print("10. custom theme values are sanitized server-side")
+        evil = {"bgFrom": "red), url(https://evil.example/t.png", "bgTo": "#123456",
+                "backgroundImage": "https://evil.example/pixel.png",
+                "stickers": [{"id": "s", "kind": "nope", "x": 9, "y": 9, "size": 1}]}
+        r = pg.request.patch(BASE + "/api/projects",
+                             data={"id": project_id, "custom_theme": evil})
+        ct = (r.json().get("project") or {}).get("custom_theme") or {} if r.ok else {}
+        check("hostile color replaced", ct.get("bgFrom", "").startswith("#")
+              and "url(" not in str(ct), str(ct.get("bgFrom")))
+        check("foreign background URL dropped", ct.get("backgroundImage") is None)
+        check("unknown sticker kind dropped", ct.get("stickers") == [])
+        check("valid color kept", ct.get("bgTo") == "#123456")
+
+        print("11. auth redirects")
+        anon = b.new_context()
+        ap = anon.new_page()
+        ap.goto("%s/editor/%s" % (BASE, project_id), wait_until="networkidle", timeout=60000)
+        check("signed-out /editor -> /login?next=", "/login?next=" in ap.url, ap.url)
+        anon.close()
+        pg.goto(BASE + "/login", wait_until="networkidle", timeout=60000)
+        check("signed-in /login -> /dashboard", pg.url.rstrip("/").endswith("/dashboard"), pg.url)
+
+        print("12. deleting the project removes its files from Storage")
+        before = pg.request.get(photo_url).status if photo_url else 0
+        r = pg.request.delete(BASE + "/api/projects", data={"id": project_id})
+        check("project deleted", r.ok, str(r.status))
+        after = pg.request.get(photo_url).status if photo_url else 0
+        check("photo file gone from Storage", before == 200 and after in (400, 404),
+              "before=%s after=%s" % (before, after))
 
         print("")
         print("console errors (creator session): %d" % len(errs))
